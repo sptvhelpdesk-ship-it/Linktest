@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>S-PTV Direct</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.min.js"></script>
+    <title>S-PTV Direct 4.7</title>
+    
+    <!-- 🔥 Shaka Player 4.7.11 (Latest) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.ui.min.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     
@@ -24,14 +26,9 @@
 
         /* Branding */
         .brand-overlay {
-            position: absolute; 
-            top: 10px; right: 10px; 
-            display: flex; flex-direction: column; 
-            align-items: center; justify-content: center;
-            z-index: 50; 
-            opacity: 0.7; pointer-events: none;
+            position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; z-index: 50; opacity: 0.7; pointer-events: none;
         }
-
         .brand-logo { width: 25px; height: auto; margin-bottom: -2px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
         .brand-text { font-family: 'Permanent Marker', cursive; font-size: 7px; color: #fff; text-shadow: 1px 1px 2px #000; letter-spacing: 0.5px; margin: 0; padding: 0; text-align: center; line-height: 1; }
 
@@ -62,13 +59,12 @@
         .popup-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 30; display: none; }
         .popup-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 1px solid #444; border-radius: 10px; width: 260px; max-height: 80%; overflow-y: auto; display: none; flex-direction: column; z-index: 35; }
         .popup-item { padding: 12px 15px; cursor: pointer; font-size: 13px; color: #ccc; display: flex; justify-content: space-between; border-bottom: 1px solid #222; }
-        .kbps { font-size: 11px; color: #777; }
         
         #error-msg { position: absolute; top: 40%; width: 100%; text-align: center; color: #ff4444; font-size: 16px; display: none; z-index: 5; text-shadow: 0 0 5px black; }
     </style>
 </head>
 <body>
-    <div class="video-container" id="video-container" onclick="toggleControls()">
+    <div class="video-container" id="video-container" onclick="handleContainerClick()">
         <video id="video" autoplay playsinline></video>
         
         <!-- Branding -->
@@ -81,9 +77,9 @@
         <div class="spinner" id="buffering-spinner"></div>
 
         <div class="center-overlay" id="center-controls">
-            <button class="center-btn" onclick="event.stopPropagation(); skip(-10)"><span class="material-icons medium">replay_10</span></button>
-            <button class="center-btn" onclick="event.stopPropagation(); togglePlay()"><span class="material-icons large" id="center-play-icon">pause</span></button>
-            <button class="center-btn" onclick="event.stopPropagation(); skip(10)"><span class="material-icons medium">forward_10</span></button>
+            <button class="center-btn" onclick="event.stopPropagation(); triggerAd(); skip(-10)"><span class="material-icons medium">replay_10</span></button>
+            <button class="center-btn" onclick="event.stopPropagation(); triggerAd(); togglePlay()"><span class="material-icons large" id="center-play-icon">pause</span></button>
+            <button class="center-btn" onclick="event.stopPropagation(); triggerAd(); skip(10)"><span class="material-icons medium">forward_10</span></button>
         </div>
 
         <div class="popup-overlay" id="popup-overlay" onclick="closeAllMenus()"></div>
@@ -91,25 +87,46 @@
         <div class="popup-menu" id="audio-menu"></div>
 
         <div class="custom-controls" id="controls" onclick="event.stopPropagation()">
-            <div class="seek-bar-container" onclick="seekVideo(event)"><div class="seek-fill" id="seek-fill"></div></div>
+            <div class="seek-bar-container" onclick="triggerAd(); seekVideo(event)"><div class="seek-fill" id="seek-fill"></div></div>
             <div class="buttons-row">
                 <div class="left-buttons">
-                    <button class="icon-btn" onclick="togglePlay()"><span class="material-icons" id="play-icon">pause</span></button>
-                    <button class="icon-btn" onclick="toggleMute()"><span class="material-icons" id="vol-icon">volume_up</span></button>
+                    <button class="icon-btn" onclick="triggerAd(); togglePlay()"><span class="material-icons" id="play-icon">pause</span></button>
+                    <button class="icon-btn" onclick="triggerAd(); toggleMute()"><span class="material-icons" id="vol-icon">volume_up</span></button>
                     <span class="time-text" id="time-display" onclick="goLive()">0:00</span>
                 </div>
                 <div class="right-buttons">
-                    <button class="icon-btn" onclick="openMenu('quality-menu')"><span class="material-icons">settings</span></button>
-                    <button class="icon-btn" onclick="openMenu('audio-menu')"><span class="material-icons">language</span></button>
-                    <button class="icon-btn" onclick="togglePiP()"><span class="material-icons">picture_in_picture_alt</span></button>
-                    <button class="icon-btn" onclick="toggleFull()"><span class="material-icons">fullscreen</span></button>
+                    <button class="icon-btn" onclick="triggerAd(); openMenu('quality-menu')"><span class="material-icons">settings</span></button>
+                    <button class="icon-btn" onclick="triggerAd(); openMenu('audio-menu')"><span class="material-icons">language</span></button>
+                    <button class="icon-btn" onclick="triggerAd(); togglePiP()"><span class="material-icons">picture_in_picture_alt</span></button>
+                    <button class="icon-btn" onclick="triggerAd(); toggleFull()"><span class="material-icons">fullscreen</span></button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
+        // ==========================================
         const CF_WORKER = ''; 
+        // 🔥 Adsterra Smartlink
+        const AD_LINK = 'https://www.effectivegatecpm.com/w6q9i150y?key=4b08b19ec61654084667a37e370d6f99'; 
+        // ==========================================
+
+        let canShowAd = false;
+        setTimeout(() => { canShowAd = true; console.log("Ad Ready"); }, 240000); 
+
+        function triggerAd() {
+            if (canShowAd) {
+                window.open(AD_LINK, '_blank'); 
+                canShowAd = false; 
+                setTimeout(() => { canShowAd = true; console.log("Ad Ready Again"); }, 900000); 
+            }
+        }
+
+        function handleContainerClick() {
+            triggerAd();
+            toggleControls();
+        }
+
         let player;
         const video = document.getElementById('video');
         const spinner = document.getElementById('buffering-spinner');
@@ -129,6 +146,7 @@
                     }
                 });
 
+                // URL Parsing Logic
                 const urlParams = new URLSearchParams(window.location.search);
                 const directLink = urlParams.get('play');
                 const k1 = urlParams.get('k1');
@@ -141,7 +159,7 @@
                     }
                     loadPlayer(directLink, drmConfig);
                 } else {
-                    showError("Error: Use ?play=URL");
+                    showError("Error: Use ?play=URL&k1=ID&k2=KEY");
                 }
             } else {
                 showError("Browser Not Supported");
@@ -150,7 +168,8 @@
 
         async function loadPlayer(url, drmConfig) {
             errorMsg.style.display = 'none';
-            // 🔥 Updated Configuration (Like the Working Player)
+            
+            // 🔥 Updated Configuration (Matched with your working player)
             const config = {
                 streaming: { 
                     bufferingGoal: 10,  // সেইফ বাফারিং
@@ -171,6 +190,7 @@
             player.configure(config);
             try {
                 await player.load(url);
+                try { video.muted = false; await video.play(); } catch { video.muted = true; await video.play(); }
                 startTimer();
                 updateMenus();
                 showControls();
