@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>S-PTV Direct</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.min.js"></script>
+    <!-- Updated to Latest Shaka Player Version -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.11.4/shaka-player.ui.min.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     
     <style>
@@ -138,12 +139,16 @@
 
                 if (directLink) {
                     let drmConfig = {};
+                    
+                    // আপডেট: যদি k1 এবং k2 থাকে, তাহলেই DRM কনফিগ সেট হবে
+                    // না থাকলে ফাঁকা থাকবে, যা সাধারণ m3u8/php/mpd সাপোর্ট করবে
                     if (k1 && k2) {
                         drmConfig = { clearKeys: { [k1]: k2 } };
                     }
+                    
                     loadPlayer(directLink, drmConfig);
                 } else {
-                    showError("Error: Use ?play=URL&k1=ID&k2=KEY");
+                    showError("Error: Use ?play=URL");
                 }
 
             } else {
@@ -179,7 +184,10 @@
                 startTimer();
                 updateMenus();
                 showControls();
-            } catch (e) { showError("Stream Offline"); }
+            } catch (e) { 
+                console.error(e);
+                showError("Stream Offline or Error"); 
+            }
         }
 
         function showError(msg) {
@@ -240,4 +248,4 @@
         document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
-<html>
+</html>
