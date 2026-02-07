@@ -21,7 +21,6 @@
             flex-shrink: 0; 
         }
         
-        /* Autoplay removed via JS logic, keeping CSS same */
         video { width: 100%; height: 100%; object-fit: contain; }
 
         .spinner {
@@ -69,7 +68,6 @@
         .kbps { font-size: 11px; color: #777; }
         #error-msg { position: absolute; top: 40%; width: 100%; text-align: center; color: #ff4444; font-size: 16px; display: none; z-index: 5; text-shadow: 0 0 5px black; }
 
-        /* DEBUG BOX STYLES */
         .debug-toggle-btn {
             margin-top: 10px; padding: 8px 20px; background: #333; color: #fff; border: 1px solid #555;
             cursor: pointer; font-size: 12px; border-radius: 4px; z-index: 100;
@@ -90,7 +88,6 @@
 <body>
 
     <div class="video-container" id="video-container" onclick="toggleControls()">
-        <!-- Autoplay REMOVED as per instruction -->
         <video id="video" playsinline></video>
         <div id="error-msg">Loading...</div>
         <div class="spinner" id="buffering-spinner"></div>
@@ -123,34 +120,28 @@
         </div>
     </div>
 
-    <!-- Debug UI -->
-    <button class="debug-toggle-btn" onclick="toggleDebug()">Show Debug Logs (Click Here if Video Fails)</button>
+    <button class="debug-toggle-btn" onclick="toggleDebug()">Show Debug Logs</button>
     <div class="debug-container" id="debug-box"></div>
 
     <script>
-        const CF_WORKER = ''; 
         let player;
         const video = document.getElementById('video');
         const spinner = document.getElementById('buffering-spinner');
         const errorMsg = document.getElementById('error-msg');
         let hideTimeout;
-        let isFirstClick = true; // For Tap to Play
 
-        // DEBUG LOGGING FUNCTION
         function log(msg, type = 'info') {
             const box = document.getElementById('debug-box');
             const entry = document.createElement('div');
             entry.className = 'log-entry';
             const time = new Date().toLocaleTimeString();
-            
             let colorClass = 'log-info';
             if(type === 'error') colorClass = 'log-error';
             if(type === 'warn') colorClass = 'log-warn';
             if(type === 'net') colorClass = 'log-net';
-
             entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${colorClass}">${msg}</span>`;
             box.appendChild(entry);
-            box.scrollTop = box.scrollHeight; 
+            box.scrollTop = box.scrollHeight;
             console.log(`[${type.toUpperCase()}] ${msg}`);
         }
 
@@ -166,38 +157,26 @@
         }
 
         async function init() {
-            log("System: Initializing Player...", "info");
-            log("Browser: " + navigator.userAgent, "info");
+            log("System: Initializing...", "info");
             
+            // 1. Install Polyfills
             shaka.polyfill.installAll();
+            
             if (shaka.Player.isBrowserSupported()) {
-                log("System: Browser Support Verified.", "info");
+                // 2. Create Player Instance (Manual Init)
+                player = new shaka.Player();
                 
-                player = new shaka.Player(video);
+                // 3. Attach to Video Element
+                await player.attach(video);
                 
-                // ERROR HANDLER
                 player.addEventListener('error', (event) => {
                     const error = event.detail;
                     log(`SHAKA ERROR [${error.code}]: ${error.message}`, "error");
-                    if (error.data && error.data[0]) {
-                        log(`Technical Detail: ${error.data[0]}`, "error");
-                    }
                     showError(`Error ${error.code}: ${error.message}`);
                 });
 
                 player.addEventListener('buffering', (e) => {
                     spinner.style.display = e.buffering ? 'block' : 'none';
-                    if(e.buffering) log("Status: Buffering...", "warn");
-                });
-                
-                // Optional Worker Support (Kept but Clean)
-                player.getNetworkingEngine().registerRequestFilter(function(type, request) {
-                    if (CF_WORKER && CF_WORKER.startsWith('http')) {
-                        request.uris = request.uris.map(uri => CF_WORKER + '?url=' + encodeURIComponent(uri));
-                        log(`Forwarding via CF Worker: ${request.uris[0]}`, "net");
-                    } else {
-                        log(`Network Req [${type}]: ${request.uris[0]}`, "net");
-                    }
                 });
 
                 const urlParams = new URLSearchParams(window.location.search);
@@ -205,113 +184,81 @@
                 const k1 = urlParams.get('k1');
                 const k2 = urlParams.get('k2');
 
-                log(`Params: URL=${directLink ? "Found" : "Missing"}, K1=${k1 ? "Found" : "Missing"}, K2=${k2 ? "Found" : "Missing"}`, "info");
-
                 if (directLink) {
                     let drmConfig = {};
                     if (k1 && k2) {
                         drmConfig = { clearKeys: { [k1]: k2 } };
-                        log(`DRM: ClearKey Configured for ID: ${k1}`, "info");
+                        log(`DRM: Keys provided.`, "info");
                     }
-
-                    // --- IMPLEMENTING TAP TO PLAY (STRICT) ---
-                    errorMsg.innerText = "Tap to Play";
-                    errorMsg.style.display = 'block';
-                    errorMsg.style.color = "#fff";
-                    errorMsg.style.cursor = "pointer";
-                    
-                    const container = document.getElementById('video-container');
-                    
-                    const startHandler = () => {
-                        if (!isFirstClick) return;
-                        isFirstClick = false;
-                        
-                        log("User Interaction: Tap detected. Configuring...", "info");
-                        errorMsg.innerText = "Loading...";
-                        spinner.style.display = 'block';
-                        
-                        // Execute Load
-                        loadPlayer(directLink, drmConfig);
-
-                        // Remove handler
-                        container.removeEventListener('click', startHandler);
-                    };
-                    
-                    container.addEventListener('click', startHandler);
-                    
+                    loadPlayer(directLink, drmConfig);
                 } else {
-                    log("Error: No 'play' parameter found in URL.", "error");
+                    log("Error: Missing URL parameters.", "error");
                     showError("Error: Use ?play=URL");
                 }
-
             } else {
-                log("Fatal: Browser Not Supported.", "error");
                 showError("Browser Not Supported");
             }
         }
 
         async function loadPlayer(url, drmConfig) {
             errorMsg.style.display = 'none';
-
-            // DASH DETECTOR (LOGGING ONLY - NO BEHAVIOR CHANGE)
+            spinner.style.display = 'block';
+            
+            // STRICT DASH DETECTION: Pathname Only
             let isDash = false;
             try {
-                const u = new URL(url);
-                isDash = u.pathname.endsWith('.mpd');
-            } catch(e) {
-                isDash = url.includes('.mpd');
+                const urlObj = new URL(url);
+                if (urlObj.pathname.endsWith('.mpd')) {
+                    isDash = true;
+                }
+            } catch (e) {
+                // Fallback safe check
+                if (url.includes('.mpd')) isDash = true;
             }
-            log(`Detection: Format identified as ${isDash ? "DASH (.mpd)" : "HLS/Other"}`, "info");
+            log(`Detection: ${isDash ? "DASH" : "HLS/Other"}`, "info");
 
-            // STABLE CONFIGURATION (REMOVED OVER-ENGINEERING)
+            // 4. Configure Player
             const config = {
                 streaming: { 
-                    bufferingGoal: 10,        // Stable buffer
-                    rebufferingGoal: 2,       // Stable rebuffer
+                    bufferingGoal: 10, 
+                    rebufferingGoal: 2, 
                     startAtSegmentBoundary: true,
-                    lowLatencyMode: true      // Kept for live, but with safe buffers
+                    lowLatencyMode: true
                 },
                 manifest: {
                     dash: {
-                        ignoreMinBufferTime: true // Helps with Akamai Live
+                        ignoreMinBufferTime: true
                     }
                 },
                 abr: { enabled: true, defaultBandwidthEstimate: 400000 },
                 drm: drmConfig
             };
             
-            log("Config: Applied STABLE settings (Buffer: 10s)", "info");
             player.configure(config);
 
             try {
-                log("Action: Loading Manifest...", "info");
+                log(`Loading: ${url}`, "net");
                 
-                // CRITICAL FIX: No forced mimeType. Let Shaka detect.
+                // 5. Load Stream (Direct URL)
                 await player.load(url);
-                
-                log("Action: Manifest Loaded. Attempting Play...", "info");
+                log("Load Success.", "info");
 
-                try { 
-                    video.muted = false; 
-                    await video.play(); 
-                    log("Playback: Started (Unmuted)", "info");
-                } catch { 
-                    video.muted = true; 
-                    await video.play(); 
-                    log("Playback: Started (Muted Autoplay Fallback)", "info");
-                }
-
-                if (player.isLive()) {
-                    log("Status: Live Stream Detected.", "info");
+                // 6. Autoplay Logic
+                try {
+                    video.muted = false;
+                    await video.play();
+                } catch (err) {
+                    log("Autoplay blocked, trying muted.", "warn");
+                    video.muted = true;
+                    await video.play();
                 }
                 
                 startTimer();
                 updateMenus();
                 showControls();
-            } catch (e) { 
-                log(`LOAD ERROR: ${e.message} (Code: ${e.code})`, "error");
-                console.error(e);
-                showError("Stream Failed: Check Debug Logs"); 
+            } catch (e) {
+                log(`Load Failed: ${e.message}`, "error");
+                showError("Stream Failed");
             }
         }
 
@@ -321,7 +268,6 @@
             spinner.style.display = 'none';
         }
 
-        // --- UI FUNCTIONS ---
         function openMenu(id) { closeAllMenus(); document.getElementById('popup-overlay').style.display = 'block'; document.getElementById(id).style.display = 'flex'; }
         function closeAllMenus() { document.getElementById('popup-overlay').style.display = 'none'; document.querySelectorAll('.popup-menu').forEach(m => m.style.display = 'none'); }
         
@@ -341,14 +287,8 @@
             player.getAudioLanguages().forEach(l => a.innerHTML += `<div class="popup-item" onclick="setA('${l}')">${l.toUpperCase()}</div>`);
         }
 
-        function setQ(h) { 
-            log(`User Action: Set Quality to ${h}`, "info");
-            h==='auto'?player.configure({abr:{enabled:true}}):(player.configure({abr:{enabled:false}}),player.selectVariantTrack(player.getVariantTracks().find(x=>x.height==h),true)); closeAllMenus(); 
-        }
-        function setA(l) { 
-            log(`User Action: Set Audio to ${l}`, "info");
-            player.selectAudioLanguage(l); closeAllMenus(); 
-        }
+        function setQ(h) { h==='auto'?player.configure({abr:{enabled:true}}):(player.configure({abr:{enabled:false}}),player.selectVariantTrack(player.getVariantTracks().find(x=>x.height==h),true)); closeAllMenus(); }
+        function setA(l) { player.selectAudioLanguage(l); closeAllMenus(); }
 
         function startTimer() {
             video.ontimeupdate = () => {
