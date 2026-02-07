@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>S-PTV Direct Debug</title>
+    <title>S-PTV Direct Fixed</title>
     <!-- Shaka Player Latest Version -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.11.4/shaka-player.ui.min.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -21,6 +21,7 @@
             flex-shrink: 0; 
         }
         
+        /* Autoplay removed via JS logic, keeping CSS same */
         video { width: 100%; height: 100%; object-fit: contain; }
 
         .spinner {
@@ -89,7 +90,8 @@
 <body>
 
     <div class="video-container" id="video-container" onclick="toggleControls()">
-        <video id="video" autoplay playsinline></video>
+        <!-- Autoplay REMOVED as per instruction -->
+        <video id="video" playsinline></video>
         <div id="error-msg">Loading...</div>
         <div class="spinner" id="buffering-spinner"></div>
 
@@ -126,17 +128,13 @@
     <div class="debug-container" id="debug-box"></div>
 
     <script>
-        // ==========================================
-        // PROXY ENABLED TO FIX ERROR 1002
-        const USE_PROXY = true; 
-        const PROXY_URL = 'https://corsproxy.io/?'; 
-        // ==========================================
-
+        const CF_WORKER = ''; 
         let player;
         const video = document.getElementById('video');
         const spinner = document.getElementById('buffering-spinner');
         const errorMsg = document.getElementById('error-msg');
         let hideTimeout;
+        let isFirstClick = true; // For Tap to Play
 
         // DEBUG LOGGING FUNCTION
         function log(msg, type = 'info') {
@@ -152,7 +150,7 @@
 
             entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="${colorClass}">${msg}</span>`;
             box.appendChild(entry);
-            box.scrollTop = box.scrollHeight; // Auto scroll
+            box.scrollTop = box.scrollHeight; 
             console.log(`[${type.toUpperCase()}] ${msg}`);
         }
 
@@ -181,7 +179,6 @@
                 player.addEventListener('error', (event) => {
                     const error = event.detail;
                     log(`SHAKA ERROR [${error.code}]: ${error.message}`, "error");
-                    log(`Error Category: ${error.category}, Severity: ${error.severity}`, "error");
                     if (error.data && error.data[0]) {
                         log(`Technical Detail: ${error.data[0]}`, "error");
                     }
@@ -193,12 +190,11 @@
                     if(e.buffering) log("Status: Buffering...", "warn");
                 });
                 
-                // NETWORK FILTER (UPDATED FOR PROXY)
+                // Optional Worker Support (Kept but Clean)
                 player.getNetworkingEngine().registerRequestFilter(function(type, request) {
-                    if (USE_PROXY) {
-                        // Apply proxy to all requests
-                        request.uris = request.uris.map(uri => PROXY_URL + encodeURIComponent(uri));
-                        // log(`Proxy Active: ${request.uris[0]}`, "net");
+                    if (CF_WORKER && CF_WORKER.startsWith('http')) {
+                        request.uris = request.uris.map(uri => CF_WORKER + '?url=' + encodeURIComponent(uri));
+                        log(`Forwarding via CF Worker: ${request.uris[0]}`, "net");
                     } else {
                         log(`Network Req [${type}]: ${request.uris[0]}`, "net");
                     }
@@ -216,11 +212,33 @@
                     if (k1 && k2) {
                         drmConfig = { clearKeys: { [k1]: k2 } };
                         log(`DRM: ClearKey Configured for ID: ${k1}`, "info");
-                    } else {
-                        log("DRM: No Keys provided. Playing as Clear Stream.", "warn");
                     }
+
+                    // --- IMPLEMENTING TAP TO PLAY (STRICT) ---
+                    errorMsg.innerText = "Tap to Play";
+                    errorMsg.style.display = 'block';
+                    errorMsg.style.color = "#fff";
+                    errorMsg.style.cursor = "pointer";
                     
-                    loadPlayer(directLink, drmConfig);
+                    const container = document.getElementById('video-container');
+                    
+                    const startHandler = () => {
+                        if (!isFirstClick) return;
+                        isFirstClick = false;
+                        
+                        log("User Interaction: Tap detected. Configuring...", "info");
+                        errorMsg.innerText = "Loading...";
+                        spinner.style.display = 'block';
+                        
+                        // Execute Load
+                        loadPlayer(directLink, drmConfig);
+
+                        // Remove handler
+                        container.removeEventListener('click', startHandler);
+                    };
+                    
+                    container.addEventListener('click', startHandler);
+                    
                 } else {
                     log("Error: No 'play' parameter found in URL.", "error");
                     showError("Error: Use ?play=URL");
@@ -235,7 +253,7 @@
         async function loadPlayer(url, drmConfig) {
             errorMsg.style.display = 'none';
 
-            // DASH DETECTOR
+            // DASH DETECTOR (LOGGING ONLY - NO BEHAVIOR CHANGE)
             let isDash = false;
             try {
                 const u = new URL(url);
@@ -245,46 +263,46 @@
             }
             log(`Detection: Format identified as ${isDash ? "DASH (.mpd)" : "HLS/Other"}`, "info");
 
+            // STABLE CONFIGURATION (REMOVED OVER-ENGINEERING)
             const config = {
                 streaming: { 
-                    bufferingGoal: 2, // Increased slightly for Proxy Stability
-                    rebufferingGoal: 0.5, 
-                    bufferBehind: 0, 
-                    lowLatencyMode: true,
-                    jumpLargeGaps: true,
-                    retryParameters: {
-                        maxAttempts: 3,
-                        baseDelay: 1000,
-                        timeout: 15000
-                    }
+                    bufferingGoal: 10,        // Stable buffer
+                    rebufferingGoal: 2,       // Stable rebuffer
+                    startAtSegmentBoundary: true,
+                    lowLatencyMode: true      // Kept for live, but with safe buffers
                 },
                 manifest: {
                     dash: {
-                        ignoreSuggestedPresentationDelay: true, 
-                        clockSyncUri: ''
+                        ignoreMinBufferTime: true // Helps with Akamai Live
                     }
                 },
                 abr: { enabled: true, defaultBandwidthEstimate: 400000 },
                 drm: drmConfig
             };
             
-            log("Config: Proxy Mode Enabled. Buffer set to 2s for stability.", "info");
+            log("Config: Applied STABLE settings (Buffer: 10s)", "info");
             player.configure(config);
 
             try {
-                log("Action: Loading Manifest via Proxy...", "info");
+                log("Action: Loading Manifest...", "info");
                 
-                if (isDash) {
-                    await player.load(url, 0, 'application/dash+xml');
-                } else {
-                    await player.load(url);
-                }
+                // CRITICAL FIX: No forced mimeType. Let Shaka detect.
+                await player.load(url);
                 
                 log("Action: Manifest Loaded. Attempting Play...", "info");
 
+                try { 
+                    video.muted = false; 
+                    await video.play(); 
+                    log("Playback: Started (Unmuted)", "info");
+                } catch { 
+                    video.muted = true; 
+                    await video.play(); 
+                    log("Playback: Started (Muted Autoplay Fallback)", "info");
+                }
+
                 if (player.isLive()) {
                     log("Status: Live Stream Detected.", "info");
-                    video.currentTime = player.seekRange().end - 1; // Little safer for proxy
                 }
                 
                 startTimer();
