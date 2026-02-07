@@ -3,59 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>S-PTV Direct Fixed</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.min.js"></script>
+    <title>S-PTV Direct</title>
+    <!-- Updated to Latest Shaka Player Version -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.11.4/shaka-player.ui.min.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     
     <style>
-        body { background: #000; color: #fff; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-        .video-container { width: 100%; max-width: 1000px; aspect-ratio: 16/9; background: #000; position: relative; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        video { width: 100%; height: 100%; object-fit: contain; }
-        
-        /* Branding */
-        .brand-overlay { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 50; opacity: 0.7; pointer-events: none; }
-        .brand-logo { width: 25px; height: auto; margin-bottom: -2px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
-        .brand-text { font-family: 'Permanent Marker', cursive; font-size: 7px; color: #fff; text-shadow: 1px 1px 2px #000; letter-spacing: 0.5px; margin: 0; padding: 0; text-align: center; line-height: 1; }
+        body { 
+            background: #000; color: #fff; font-family: 'Segoe UI', sans-serif; 
+            margin: 0; padding: 0; width: 100vw; height: 100vh; 
+            overflow: hidden; display: flex; align-items: center; justify-content: center;
+        }
 
-        /* Spinner */
-        .spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60px; height: 60px; border: 5px solid rgba(255,255,255,0.2); border-top: 5px solid #e50914; border-radius: 50%; animation: spin 0.8s linear infinite; z-index: 25; display: none; pointer-events: none; }
+        .video-container { 
+            width: 100%; max-width: 1000px; aspect-ratio: 16/9; 
+            background: #000; position: relative; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        
+        video { width: 100%; height: 100%; object-fit: contain; }
+
+        .spinner {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 60px; height: 60px; border: 5px solid rgba(255,255,255,0.2);
+            border-top: 5px solid #e50914; border-radius: 50%;
+            animation: spin 0.8s linear infinite; z-index: 25; display: none; pointer-events: none;
+        }
         @keyframes spin { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
 
-        /* Controls UI */
-        .center-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 40px; z-index: 10; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
-        .center-btn { background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; padding: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+        .center-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            display: flex; align-items: center; gap: 40px; z-index: 10; opacity: 0; transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .center-btn {
+            background: rgba(0,0,0,0.6); border: none; color: white; border-radius: 50%; padding: 12px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto;
+        }
         .center-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
         .material-icons.large { font-size: 45px; } .material-icons.medium { font-size: 30px; }
-        .custom-controls { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(0,0,0,0.9), transparent); padding: 10px 15px; box-sizing: border-box; display: flex; flex-direction: column; gap: 5px; opacity: 0; transition: opacity 0.3s; z-index: 20; }
+
+        .custom-controls {
+            position: absolute; 
+            bottom: 0; left: 0; width: 100%;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            padding: 10px 15px; box-sizing: border-box;
+            display: flex; flex-direction: column; gap: 5px; 
+            opacity: 0; transition: opacity 0.3s; z-index: 20;
+        }
+
         .seek-bar-container { width: 100%; height: 5px; background: rgba(255,255,255,0.3); cursor: pointer; position: relative; }
         .seek-fill { height: 100%; background: #e50914; width: 0%; position: absolute; top: 0; left: 0; }
+        
         .buttons-row { display: flex; justify-content: space-between; align-items: center; }
         .left-buttons, .right-buttons { display: flex; gap: 10px; align-items: center; }
+        
         .icon-btn { background: none; border: none; color: white; cursor: pointer; padding: 5px; display: flex; }
         .material-icons { font-size: 28px; text-shadow: 0 0 5px rgba(0,0,0,0.8); }
         .time-text { font-size: 13px; font-weight: bold; margin-left: 5px; cursor: pointer; text-shadow: 0 0 5px rgba(0,0,0,0.8); }
+
         .popup-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 30; display: none; }
-        .popup-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 1px solid #444; border-radius: 10px; width: 260px; max-height: 80%; overflow-y: auto; display: none; flex-direction: column; z-index: 35; }
+        .popup-menu {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: #1a1a1a; border: 1px solid #444; border-radius: 10px;
+            width: 260px; max-height: 80%; overflow-y: auto; display: none; flex-direction: column; z-index: 35;
+        }
         .popup-item { padding: 12px 15px; cursor: pointer; font-size: 13px; color: #ccc; display: flex; justify-content: space-between; border-bottom: 1px solid #222; }
         .kbps { font-size: 11px; color: #777; }
+        
         #error-msg { position: absolute; top: 40%; width: 100%; text-align: center; color: #ff4444; font-size: 16px; display: none; z-index: 5; text-shadow: 0 0 5px black; }
     </style>
 </head>
 <body>
     <div class="video-container" id="video-container" onclick="toggleControls()">
-        <video id="video" playsinline></video>
-        <div class="brand-overlay"><img src="https://i.ibb.co/Xr4DHqDL/1000298705-removebg-preview.png" class="brand-logo"><span class="brand-text">SPORTIFY TV</span></div>
+        <video id="video" autoplay playsinline></video>
         <div id="error-msg">Loading...</div>
         <div class="spinner" id="buffering-spinner"></div>
+
         <div class="center-overlay" id="center-controls">
             <button class="center-btn" onclick="event.stopPropagation(); skip(-10)"><span class="material-icons medium">replay_10</span></button>
             <button class="center-btn" onclick="event.stopPropagation(); togglePlay()"><span class="material-icons large" id="center-play-icon">pause</span></button>
             <button class="center-btn" onclick="event.stopPropagation(); skip(10)"><span class="material-icons medium">forward_10</span></button>
         </div>
+
         <div class="popup-overlay" id="popup-overlay" onclick="closeAllMenus()"></div>
         <div class="popup-menu" id="quality-menu"></div>
         <div class="popup-menu" id="audio-menu"></div>
+
         <div class="custom-controls" id="controls" onclick="event.stopPropagation()">
             <div class="seek-bar-container" onclick="seekVideo(event)"><div class="seek-fill" id="seek-fill"></div></div>
             <div class="buttons-row">
@@ -75,9 +108,15 @@
     </div>
 
     <script>
+        // ==========================================
         const CF_WORKER = ''; 
-        let player, video = document.getElementById('video'), spinner = document.getElementById('buffering-spinner'), errorMsg = document.getElementById('error-msg'), hideTimeout;
-        let isFirstClick = true;
+        // ==========================================
+
+        let player;
+        const video = document.getElementById('video');
+        const spinner = document.getElementById('buffering-spinner');
+        const errorMsg = document.getElementById('error-msg');
+        let hideTimeout;
 
         async function init() {
             shaka.polyfill.installAll();
@@ -86,10 +125,13 @@
                 player.addEventListener('error', console.error);
                 player.addEventListener('buffering', (e) => spinner.style.display = e.buffering ? 'block' : 'none');
                 
-                player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                    if (CF_WORKER && CF_WORKER.startsWith('http')) request.uris = request.uris.map(uri => CF_WORKER + '?url=' + encodeURIComponent(uri));
+                player.getNetworkingEngine().registerRequestFilter(function(type, request) {
+                    if (CF_WORKER && CF_WORKER.startsWith('http')) {
+                        request.uris = request.uris.map(uri => CF_WORKER + '?url=' + encodeURIComponent(uri));
+                    }
                 });
 
+                // URL থেকে সরাসরি লিংক এবং Key নেওয়া
                 const urlParams = new URLSearchParams(window.location.search);
                 const directLink = urlParams.get('play');
                 const k1 = urlParams.get('k1');
@@ -97,44 +139,26 @@
 
                 if (directLink) {
                     let drmConfig = {};
-                    if (k1 && k2) drmConfig = { clearKeys: { [k1]: k2 } };
-
-                    // Start: User Interaction Logic
-                    errorMsg.innerText = "Tap to Play";
-                    errorMsg.style.display = 'block';
-                    errorMsg.style.color = "#fff";
-                    errorMsg.style.cursor = "pointer";
                     
-                    const container = document.getElementById('video-container');
+                    // আপডেট: যদি k1 এবং k2 থাকে, তাহলেই DRM কনফিগ সেট হবে
+                    if (k1 && k2) {
+                        drmConfig = { clearKeys: { [k1]: k2 } };
+                    }
                     
-                    const startHandler = () => {
-                        if (!isFirstClick) return;
-                        isFirstClick = false;
-                        
-                        errorMsg.innerText = "Loading...";
-                        spinner.style.display = 'block';
-                        
-                        // Delay to register gesture
-                        setTimeout(() => {
-                            loadPlayer(directLink, drmConfig);
-                        }, 400);
-
-                        container.removeEventListener('click', startHandler);
-                    };
-                    
-                    container.addEventListener('click', startHandler);
-                    // End: User Interaction Logic
-
+                    loadPlayer(directLink, drmConfig);
                 } else {
                     showError("Error: Use ?play=URL");
                 }
-            } else { showError("Browser Not Supported"); }
+
+            } else {
+                showError("Browser Not Supported");
+            }
         }
 
         async function loadPlayer(url, drmConfig) {
             errorMsg.style.display = 'none';
-            
-            // Fixed DASH Detection Logic: Ignores query params
+
+            // Fixed DASH Detection Logic for URLs with Query Params
             let isDash = false;
             try {
                 const u = new URL(url);
@@ -143,62 +167,95 @@
                 isDash = url.includes('.mpd');
             }
 
+            // ফাস্ট স্টার্ট + নো ডিলে
             const config = {
                 streaming: { 
-                    bufferingGoal: 10, 
-                    rebufferingGoal: 2, 
-                    startAtSegmentBoundary: true,
-                    lowLatencyMode: true
+                    bufferingGoal: 0.5, 
+                    rebufferingGoal: 0.01, 
+                    bufferBehind: 0, 
+                    lowLatencyMode: true,
+                    jumpLargeGaps: true
+                },
+                manifest: {
+                    dash: {
+                        ignoreSuggestedPresentationDelay: true, 
+                        clockSyncUri: ''
+                    }
                 },
                 abr: { enabled: true, defaultBandwidthEstimate: 400000 },
                 drm: drmConfig
             };
             
-            // Apply DASH specific config only if DASH is detected
-            if (isDash) {
-                config.manifest = {
-                    dash: {
-                        ignoreMinBufferTime: true
-                    }
-                };
-            }
-            
             player.configure(config);
             try {
-                await player.load(url);
-
-                try { 
-                    video.muted = false; 
-                    await video.play(); 
-                } catch { 
-                    video.muted = true; 
-                    await video.play(); 
+                // Pass mime type hint if DASH to ensure correct parsing with query params
+                if (isDash) {
+                    await player.load(url, 0, 'application/dash+xml');
+                } else {
+                    await player.load(url);
                 }
+
+                if (player.isLive()) video.currentTime = player.seekRange().end - 0.1;
                 startTimer();
                 updateMenus();
                 showControls();
-            } catch (e) { showError("Stream Offline"); }
+            } catch (e) { 
+                console.error(e);
+                showError("Stream Offline or Error"); 
+            }
         }
 
-        function showError(msg) { errorMsg.style.display = 'block'; errorMsg.innerText = msg; errorMsg.style.color = "#ff4444"; spinner.style.display = 'none'; }
+        function showError(msg) {
+            errorMsg.style.display = 'block';
+            errorMsg.innerText = msg;
+            spinner.style.display = 'none';
+        }
+
         function openMenu(id) { closeAllMenus(); document.getElementById('popup-overlay').style.display = 'block'; document.getElementById(id).style.display = 'flex'; }
         function closeAllMenus() { document.getElementById('popup-overlay').style.display = 'none'; document.querySelectorAll('.popup-menu').forEach(m => m.style.display = 'none'); }
-        function updateMenus() { 
-            const q = document.getElementById('quality-menu'); q.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Quality <span onclick="closeAllMenus()" style="cursor:pointer">×</span></div><div class="popup-item" onclick="setQ('auto')">Auto <span class="kbps">Rec.</span></div>`; const tracks = player.getVariantTracks(); const seen = new Set(); tracks.sort((a,b) => b.height - a.height).forEach(t => { if(t.height && !seen.has(t.height)) { seen.add(t.height); q.innerHTML += `<div class="popup-item" onclick="setQ(${t.height})">${t.height}p <span class="kbps">${Math.round(t.bandwidth/1000)} kbps</span></div>`; } });
-            const a = document.getElementById('audio-menu'); a.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Audio <span onclick="closeAllMenus()" style="cursor:pointer">×</span></div>`; player.getAudioLanguages().forEach(l => a.innerHTML += `<div class="popup-item" onclick="setA('${l}')">${l.toUpperCase()}</div>`);
+        
+        function updateMenus() {
+            const q = document.getElementById('quality-menu');
+            q.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Quality <span onclick="closeAllMenus()" style="cursor:pointer">×</span></div><div class="popup-item" onclick="setQ('auto')">Auto <span class="kbps">Rec.</span></div>`;
+            const tracks = player.getVariantTracks();
+            const seen = new Set();
+            tracks.sort((a,b) => b.height - a.height).forEach(t => {
+                if(t.height && !seen.has(t.height)) {
+                    seen.add(t.height);
+                    q.innerHTML += `<div class="popup-item" onclick="setQ(${t.height})">${t.height}p <span class="kbps">${Math.round(t.bandwidth/1000)} kbps</span></div>`;
+                }
+            });
+            const a = document.getElementById('audio-menu');
+            a.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Audio <span onclick="closeAllMenus()" style="cursor:pointer">×</span></div>`;
+            player.getAudioLanguages().forEach(l => a.innerHTML += `<div class="popup-item" onclick="setA('${l}')">${l.toUpperCase()}</div>`);
         }
+
         function setQ(h) { h==='auto'?player.configure({abr:{enabled:true}}):(player.configure({abr:{enabled:false}}),player.selectVariantTrack(player.getVariantTracks().find(x=>x.height==h),true)); closeAllMenus(); }
         function setA(l) { player.selectAudioLanguage(l); closeAllMenus(); }
-        function startTimer() { video.ontimeupdate = () => { if(player.isLive()) { const lat = player.seekRange().end - video.currentTime; lat < 5 ? (document.getElementById('time-display').innerHTML = '<span style="color:#e50914">●</span> LIVE', document.getElementById('seek-fill').style.width = '100%') : (document.getElementById('time-display').innerText = "-" + formatTime(lat), document.getElementById('time-display').style.color = "#ccc", document.getElementById('seek-fill').style.width = (((video.currentTime - player.seekRange().start)/(player.seekRange().end - player.seekRange().start))*100) + '%'); } else { document.getElementById('seek-fill').style.width = ((video.currentTime/video.duration)*100) + '%'; document.getElementById('time-display').innerText = formatTime(video.currentTime) + " / " + formatTime(video.duration); } }; }
+
+        function startTimer() {
+            video.ontimeupdate = () => {
+                if(player.isLive()) {
+                    const lat = player.seekRange().end - video.currentTime;
+                    lat < 5 ? (document.getElementById('time-display').innerHTML = '<span style="color:#e50914">●</span> LIVE', document.getElementById('seek-fill').style.width = '100%') 
+                            : (document.getElementById('time-display').innerText = "-" + formatTime(lat), document.getElementById('time-display').style.color = "#ccc", document.getElementById('seek-fill').style.width = (((video.currentTime - player.seekRange().start)/(player.seekRange().end - player.seekRange().start))*100) + '%');
+                } else {
+                    document.getElementById('seek-fill').style.width = ((video.currentTime/video.duration)*100) + '%';
+                    document.getElementById('time-display').innerText = formatTime(video.currentTime) + " / " + formatTime(video.duration);
+                }
+            };
+        }
         function formatTime(s) { const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec < 10 ? '0' : ''}${sec}`; }
         function skip(v) { video.currentTime += v; showControls(); }
         function goLive() { if(player.isLive()) video.currentTime = player.seekRange().end - 0.5; }
         function seekVideo(e) { const r = e.currentTarget.getBoundingClientRect(), p = (e.clientX - r.left) / r.width; player.isLive() ? video.currentTime = player.seekRange().start + ((player.seekRange().end - player.seekRange().start) * p) : video.currentTime = p * video.duration; }
+        
         function togglePlay() { video.paused ? (video.play(), updIcon('pause')) : (video.pause(), updIcon('play_arrow')); showControls(); }
         function updIcon(i) { document.getElementById('play-icon').innerText = i; document.getElementById('center-play-icon').innerText = i; }
         function toggleMute() { video.muted = !video.muted; document.getElementById('vol-icon').innerText = video.muted ? 'volume_off' : 'volume_up'; }
         function toggleFull() { !document.fullscreenElement ? document.getElementById('video-container').requestFullscreen() : document.exitFullscreen(); }
         function togglePiP() { document.pictureInPictureElement ? document.exitPictureInPicture() : video.requestPictureInPicture(); }
+        
         function toggleControls() { document.getElementById('controls').style.opacity === '1' ? hideControls() : showControls(); }
         function showControls() { document.getElementById('controls').style.opacity = '1'; document.getElementById('center-controls').style.opacity = '1'; document.getElementById('video-container').style.cursor = 'default'; clearTimeout(hideTimeout); if(!video.paused) hideTimeout = setTimeout(hideControls, 3000); }
         function hideControls() { if(!video.paused && document.getElementById('popup-overlay').style.display !== 'block') { document.getElementById('controls').style.opacity = '0'; document.getElementById('center-controls').style.opacity = '0'; document.getElementById('video-container').style.cursor = 'none'; } }
