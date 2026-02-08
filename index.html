@@ -119,6 +119,7 @@
         let hideTimeout;
 
         async function init() {
+            // Latest Shaka Polyfill
             shaka.polyfill.installAll();
             if (shaka.Player.isBrowserSupported()) {
                 player = new shaka.Player(video);
@@ -131,7 +132,7 @@
                     }
                 });
 
-                // URL Parameter Logic
+                // URL Parameter Detection
                 const urlParams = new URLSearchParams(window.location.search);
                 const directLink = urlParams.get('play');
                 const k1 = urlParams.get('k1');
@@ -139,6 +140,7 @@
 
                 if (directLink) {
                     let drmConfig = {};
+                    // Logic to handle both DRM and Non-DRM links automatically
                     if (k1 && k2) {
                         drmConfig = { clearKeys: { [k1]: k2 } };
                     }
@@ -155,24 +157,13 @@
         async function loadPlayer(url, drmConfig) {
             errorMsg.style.display = 'none';
             
-            // ==========================================================
-            // OPTIMIZED CONFIGURATION (Based on Reference Logic for Stability)
-            // ==========================================================
+            // OPTIMIZED CONFIGURATION FOR BALANCED PERFORMANCE
             const config = {
                 streaming: { 
-                    lowLatencyMode: true,       // Keep Low Latency
-                    bufferingGoal: 10,          // Reference: 10s (Better Stability)
-                    rebufferingGoal: 2,         // Reference: 2s (Prevents Stutter)
-                    bufferBehind: 10,           // Reference: 10s
-                    retryParameters: {          // Reference: Robust Network Handling
-                        timeout: 8000,          // 8s timeout
-                        maxAttempts: 4,         // Try 4 times
-                        baseDelay: 200,
-                        backoffFactor: 1.2
-                    },
-                    segmentRequestTimeout: 6000,
-                    segmentPrefetchLimit: 2,    // Reference: Pre-load next 2 segments
-                    useNativeHlsOnSafari: true, // Reference: Better for iPhone/Mac
+                    bufferingGoal: 3,           // 3 Seconds: Balanced start & stability
+                    rebufferingGoal: 2,         // 2 Seconds: Prevents rapid stuttering
+                    bufferBehind: 10,           // Keep 10s buffer in memory
+                    lowLatencyMode: true,       // As requested
                     jumpLargeGaps: true,
                     inaccurateManifestTolerance: 0,
                     stallEnabled: true
@@ -184,16 +175,11 @@
                     },
                     hls: {
                         ignoreManifestProgramDateTime: true
-                    },
-                    retryParameters: {          // Reference: Manifest Retry Logic
-                        timeout: 6000,
-                        maxAttempts: 2
                     }
                 },
                 abr: { 
                     enabled: true, 
-                    defaultBandwidthEstimate: 1000000, 
-                    switchInterval: 0 
+                    // Let Shaka detect speed automatically (Auto Quality)
                 },
                 drm: drmConfig
             };
@@ -201,13 +187,13 @@
             player.configure(config);
             try {
                 await player.load(url);
-                if (player.isLive()) video.currentTime = player.seekRange().end - 1; // Slightly safer live point
+                if (player.isLive()) video.currentTime = player.seekRange().end - 1;
                 startTimer();
                 updateMenus();
                 showControls();
             } catch (e) { 
                 console.error(e);
-                showError("Stream Offline or Error"); 
+                showError("Stream Offline"); 
             }
         }
 
