@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>S-PTV Direct</title>
-    <!-- Latest Stable Shaka Player Version -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.12.6/shaka-player.ui.min.js"></script>
+    <!-- Shaka Player Version 4.7.11 as requested -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.ui.min.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     
     <style>
@@ -119,7 +119,6 @@
         let hideTimeout;
 
         async function init() {
-            // Latest Shaka Polyfill
             shaka.polyfill.installAll();
             if (shaka.Player.isBrowserSupported()) {
                 player = new shaka.Player(video);
@@ -132,7 +131,6 @@
                     }
                 });
 
-                // URL Parameter Detection
                 const urlParams = new URLSearchParams(window.location.search);
                 const directLink = urlParams.get('play');
                 const k1 = urlParams.get('k1');
@@ -140,7 +138,6 @@
 
                 if (directLink) {
                     let drmConfig = {};
-                    // Logic to handle both DRM and Non-DRM links automatically
                     if (k1 && k2) {
                         drmConfig = { clearKeys: { [k1]: k2 } };
                     }
@@ -157,13 +154,19 @@
         async function loadPlayer(url, drmConfig) {
             errorMsg.style.display = 'none';
             
-            // OPTIMIZED CONFIGURATION FOR BALANCED PERFORMANCE
+            // CONFIGURATION FOR STABLE PLAYBACK (5s Buffer)
             const config = {
                 streaming: { 
-                    bufferingGoal: 3,           // 3 Seconds: Balanced start & stability
-                    rebufferingGoal: 2,         // 2 Seconds: Prevents rapid stuttering
-                    bufferBehind: 10,           // Keep 10s buffer in memory
-                    lowLatencyMode: true,       // As requested
+                    bufferingGoal: 5,           // 5 Seconds buffer as requested (Stops "Chirik Chirik")
+                    rebufferingGoal: 2,         // Wait 2s if stuck to gather data
+                    bufferBehind: 10,           // Keep 10s back buffer
+                    lowLatencyMode: true,       // Kept true, but buffer goal 5s ensures stability
+                    retryParameters: {          // Aggressive retry if net fails
+                        timeout: 8000,
+                        maxAttempts: 4,
+                        baseDelay: 500,
+                        backoffFactor: 1.5
+                    },
                     jumpLargeGaps: true,
                     inaccurateManifestTolerance: 0,
                     stallEnabled: true
@@ -179,7 +182,7 @@
                 },
                 abr: { 
                     enabled: true, 
-                    // Let Shaka detect speed automatically (Auto Quality)
+                    switchInterval: 0 
                 },
                 drm: drmConfig
             };
@@ -187,6 +190,15 @@
             player.configure(config);
             try {
                 await player.load(url);
+                
+                // Force Autoplay Logic
+                video.play().catch(() => {
+                    // If sound blocks autoplay, mute and play
+                    video.muted = true;
+                    video.play();
+                    updIcon('pause'); // Update icon
+                });
+
                 if (player.isLive()) video.currentTime = player.seekRange().end - 1;
                 startTimer();
                 updateMenus();
@@ -207,7 +219,6 @@
         function closeAllMenus() { document.getElementById('popup-overlay').style.display = 'none'; document.querySelectorAll('.popup-menu').forEach(m => m.style.display = 'none'); }
         
         function updateMenus() {
-            // Quality Menu
             const q = document.getElementById('quality-menu');
             q.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Quality <span onclick="closeAllMenus()" style="cursor:pointer">×</span></div><div class="popup-item" onclick="setQ('auto')">Auto <span class="kbps">Rec.</span></div>`;
             const tracks = player.getVariantTracks();
@@ -219,7 +230,6 @@
                 }
             });
 
-            // Audio Menu with Full Language Names
             const a = document.getElementById('audio-menu');
             a.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Audio <span onclick="closeAllMenus()" style="cursor:pointer">×</span></div>`;
             
@@ -229,9 +239,9 @@
             player.getAudioLanguages().forEach(l => {
                 let label;
                 try {
-                    label = langName.of(l); // Converts 'en' to 'English', 'bn' to 'Bengali'
+                    label = langName.of(l);
                 } catch(e) {
-                    label = l.toUpperCase(); // Fallback
+                    label = l.toUpperCase();
                 }
                 a.innerHTML += `<div class="popup-item" onclick="setA('${l}')">${label}</div>`;
             });
@@ -244,7 +254,7 @@
             video.ontimeupdate = () => {
                 if(player.isLive()) {
                     const lat = player.seekRange().end - video.currentTime;
-                    lat < 5 ? (document.getElementById('time-display').innerHTML = '<span style="color:#e50914">●</span> LIVE', document.getElementById('seek-fill').style.width = '100%') 
+                    lat < 6 ? (document.getElementById('time-display').innerHTML = '<span style="color:#e50914">●</span> LIVE', document.getElementById('seek-fill').style.width = '100%') 
                             : (document.getElementById('time-display').innerText = "-" + formatTime(lat), document.getElementById('time-display').style.color = "#ccc", document.getElementById('seek-fill').style.width = (((video.currentTime - player.seekRange().start)/(player.seekRange().end - player.seekRange().start))*100) + '%');
                 } else {
                     document.getElementById('seek-fill').style.width = ((video.currentTime/video.duration)*100) + '%';
@@ -254,7 +264,7 @@
         }
         function formatTime(s) { const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec < 10 ? '0' : ''}${sec}`; }
         function skip(v) { video.currentTime += v; showControls(); }
-        function goLive() { if(player.isLive()) video.currentTime = player.seekRange().end - 0.5; }
+        function goLive() { if(player.isLive()) video.currentTime = player.seekRange().end - 1; }
         function seekVideo(e) { const r = e.currentTarget.getBoundingClientRect(), p = (e.clientX - r.left) / r.width; player.isLive() ? video.currentTime = player.seekRange().start + ((player.seekRange().end - player.seekRange().start) * p) : video.currentTime = p * video.duration; }
         
         function togglePlay() { video.paused ? (video.play(), updIcon('pause')) : (video.pause(), updIcon('play_arrow')); showControls(); }
