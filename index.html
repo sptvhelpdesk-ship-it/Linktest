@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>S-PTV Direct</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.ui.min.js"></script>
+    <!-- Updated to Latest Stable Shaka Player Version (4.12.6) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.12.6/shaka-player.ui.min.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     
     <style>
@@ -118,6 +119,7 @@
         let hideTimeout;
 
         async function init() {
+            // Latest Shaka Polyfill
             shaka.polyfill.installAll();
             if (shaka.Player.isBrowserSupported()) {
                 player = new shaka.Player(video);
@@ -130,7 +132,7 @@
                     }
                 });
 
-                // URL থেকে সরাসরি লিংক এবং Key নেওয়া
+                // URL Parameter Detection
                 const urlParams = new URLSearchParams(window.location.search);
                 const directLink = urlParams.get('play');
                 const k1 = urlParams.get('k1');
@@ -138,12 +140,13 @@
 
                 if (directLink) {
                     let drmConfig = {};
+                    // Logic to handle both DRM and Non-DRM links automatically
                     if (k1 && k2) {
                         drmConfig = { clearKeys: { [k1]: k2 } };
                     }
                     loadPlayer(directLink, drmConfig);
                 } else {
-                    showError("Error: Use ?play=URL&k1=ID&k2=KEY");
+                    showError("Error: Use ?play=URL");
                 }
 
             } else {
@@ -153,22 +156,32 @@
 
         async function loadPlayer(url, drmConfig) {
             errorMsg.style.display = 'none';
-            // ফাস্ট স্টার্ট + নো ডিলে
+            
+            // OPTIMIZED CONFIGURATION FOR INSTANT PLAY
             const config = {
                 streaming: { 
-                    bufferingGoal: 0.5, 
+                    bufferingGoal: 0.1, // Reduced to 0.1s for instant start
                     rebufferingGoal: 0.01, 
                     bufferBehind: 0, 
                     lowLatencyMode: true,
-                    jumpLargeGaps: true
+                    jumpLargeGaps: true,
+                    inaccurateManifestTolerance: 0,
+                    stallEnabled: true
                 },
                 manifest: {
                     dash: {
                         ignoreSuggestedPresentationDelay: true, 
                         clockSyncUri: ''
+                    },
+                    hls: {
+                        ignoreManifestProgramDateTime: true
                     }
                 },
-                abr: { enabled: true, defaultBandwidthEstimate: 400000 },
+                abr: { 
+                    enabled: true, 
+                    defaultBandwidthEstimate: 1000000, // Higher initial estimate for quality
+                    switchInterval: 0 
+                },
                 drm: drmConfig
             };
             
@@ -179,7 +192,10 @@
                 startTimer();
                 updateMenus();
                 showControls();
-            } catch (e) { showError("Stream Offline"); }
+            } catch (e) { 
+                console.error(e);
+                showError("Stream Offline"); 
+            }
         }
 
         function showError(msg) {
@@ -192,6 +208,7 @@
         function closeAllMenus() { document.getElementById('popup-overlay').style.display = 'none'; document.querySelectorAll('.popup-menu').forEach(m => m.style.display = 'none'); }
         
         function updateMenus() {
+            // Quality Menu
             const q = document.getElementById('quality-menu');
             q.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Quality <span onclick="closeAllMenus()" style="cursor:pointer">×</span></div><div class="popup-item" onclick="setQ('auto')">Auto <span class="kbps">Rec.</span></div>`;
             const tracks = player.getVariantTracks();
@@ -202,9 +219,23 @@
                     q.innerHTML += `<div class="popup-item" onclick="setQ(${t.height})">${t.height}p <span class="kbps">${Math.round(t.bandwidth/1000)} kbps</span></div>`;
                 }
             });
+
+            // Audio Menu with Full Language Names
             const a = document.getElementById('audio-menu');
             a.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Audio <span onclick="closeAllMenus()" style="cursor:pointer">×</span></div>`;
-            player.getAudioLanguages().forEach(l => a.innerHTML += `<div class="popup-item" onclick="setA('${l}')">${l.toUpperCase()}</div>`);
+            
+            // Language Name Converter
+            const langName = new Intl.DisplayNames(['en'], { type: 'language' });
+
+            player.getAudioLanguages().forEach(l => {
+                let label;
+                try {
+                    label = langName.of(l); // Converts 'en' to 'English', 'bn' to 'Bengali'
+                } catch(e) {
+                    label = l.toUpperCase(); // Fallback
+                }
+                a.innerHTML += `<div class="popup-item" onclick="setA('${l}')">${label}</div>`;
+            });
         }
 
         function setQ(h) { h==='auto'?player.configure({abr:{enabled:true}}):(player.configure({abr:{enabled:false}}),player.selectVariantTrack(player.getVariantTracks().find(x=>x.height==h),true)); closeAllMenus(); }
