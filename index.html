@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>S-PTV Direct</title>
-    <!-- Updated to Latest Stable Shaka Player Version (4.12.6) -->
+    <!-- Latest Stable Shaka Player Version -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.12.6/shaka-player.ui.min.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     
@@ -119,7 +119,6 @@
         let hideTimeout;
 
         async function init() {
-            // Latest Shaka Polyfill
             shaka.polyfill.installAll();
             if (shaka.Player.isBrowserSupported()) {
                 player = new shaka.Player(video);
@@ -132,7 +131,7 @@
                     }
                 });
 
-                // URL Parameter Detection
+                // URL Parameter Logic
                 const urlParams = new URLSearchParams(window.location.search);
                 const directLink = urlParams.get('play');
                 const k1 = urlParams.get('k1');
@@ -140,7 +139,6 @@
 
                 if (directLink) {
                     let drmConfig = {};
-                    // Logic to handle both DRM and Non-DRM links automatically
                     if (k1 && k2) {
                         drmConfig = { clearKeys: { [k1]: k2 } };
                     }
@@ -157,13 +155,24 @@
         async function loadPlayer(url, drmConfig) {
             errorMsg.style.display = 'none';
             
-            // OPTIMIZED CONFIGURATION FOR INSTANT PLAY
+            // ==========================================================
+            // OPTIMIZED CONFIGURATION (Based on Reference Logic for Stability)
+            // ==========================================================
             const config = {
                 streaming: { 
-                    bufferingGoal: 0.1, // Reduced to 0.1s for instant start
-                    rebufferingGoal: 0.01, 
-                    bufferBehind: 0, 
-                    lowLatencyMode: true,
+                    lowLatencyMode: true,       // Keep Low Latency
+                    bufferingGoal: 10,          // Reference: 10s (Better Stability)
+                    rebufferingGoal: 2,         // Reference: 2s (Prevents Stutter)
+                    bufferBehind: 10,           // Reference: 10s
+                    retryParameters: {          // Reference: Robust Network Handling
+                        timeout: 8000,          // 8s timeout
+                        maxAttempts: 4,         // Try 4 times
+                        baseDelay: 200,
+                        backoffFactor: 1.2
+                    },
+                    segmentRequestTimeout: 6000,
+                    segmentPrefetchLimit: 2,    // Reference: Pre-load next 2 segments
+                    useNativeHlsOnSafari: true, // Reference: Better for iPhone/Mac
                     jumpLargeGaps: true,
                     inaccurateManifestTolerance: 0,
                     stallEnabled: true
@@ -175,11 +184,15 @@
                     },
                     hls: {
                         ignoreManifestProgramDateTime: true
+                    },
+                    retryParameters: {          // Reference: Manifest Retry Logic
+                        timeout: 6000,
+                        maxAttempts: 2
                     }
                 },
                 abr: { 
                     enabled: true, 
-                    defaultBandwidthEstimate: 1000000, // Higher initial estimate for quality
+                    defaultBandwidthEstimate: 1000000, 
                     switchInterval: 0 
                 },
                 drm: drmConfig
@@ -188,13 +201,13 @@
             player.configure(config);
             try {
                 await player.load(url);
-                if (player.isLive()) video.currentTime = player.seekRange().end - 0.1;
+                if (player.isLive()) video.currentTime = player.seekRange().end - 1; // Slightly safer live point
                 startTimer();
                 updateMenus();
                 showControls();
             } catch (e) { 
                 console.error(e);
-                showError("Stream Offline"); 
+                showError("Stream Offline or Error"); 
             }
         }
 
