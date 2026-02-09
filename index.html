@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>S-PTV Direct</title>
-    <!-- Shaka Player Version 4.7.11 as requested -->
+    <!-- Shaka Player Version 4.7.11 (Stable) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.ui.min.js"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     
@@ -131,6 +131,17 @@
                     }
                 });
 
+                // Force Landscape on Fullscreen (Fix for Chrome)
+                document.addEventListener("fullscreenchange", function() {
+                    if (document.fullscreenElement) {
+                        if (screen.orientation && screen.orientation.lock) {
+                            screen.orientation.lock("landscape").catch(function(error) {
+                                // console.log("Rotation locked by browser policy");
+                            });
+                        }
+                    }
+                });
+
                 const urlParams = new URLSearchParams(window.location.search);
                 const directLink = urlParams.get('play');
                 const k1 = urlParams.get('k1');
@@ -154,22 +165,23 @@
         async function loadPlayer(url, drmConfig) {
             errorMsg.style.display = 'none';
             
-            // CONFIGURATION FOR STABLE PLAYBACK (5s Buffer)
+            // CONFIGURATION: 5s Buffer (Stable) + Black Screen Fix
             const config = {
                 streaming: { 
-                    bufferingGoal: 5,           // 5 Seconds buffer as requested (Stops "Chirik Chirik")
-                    rebufferingGoal: 2,         // Wait 2s if stuck to gather data
-                    bufferBehind: 10,           // Keep 10s back buffer
-                    lowLatencyMode: true,       // Kept true, but buffer goal 5s ensures stability
-                    retryParameters: {          // Aggressive retry if net fails
-                        timeout: 8000,
-                        maxAttempts: 4,
-                        baseDelay: 500,
-                        backoffFactor: 1.5
+                    bufferingGoal: 5,           // 5s Buffer to prevent "Chirik Chirik"
+                    rebufferingGoal: 2,         // Stable rebuffering
+                    bufferBehind: 10,
+                    lowLatencyMode: true,
+                    retryParameters: {
+                        timeout: 10000,
+                        maxAttempts: 5,
+                        baseDelay: 1000,
+                        backoffFactor: 2
                     },
                     jumpLargeGaps: true,
                     inaccurateManifestTolerance: 0,
-                    stallEnabled: true
+                    stallEnabled: true,         // Helps detect black screen stalls
+                    ignoreTextStreamFailures: true // Prevents subtitle errors
                 },
                 manifest: {
                     dash: {
@@ -182,7 +194,8 @@
                 },
                 abr: { 
                     enabled: true, 
-                    switchInterval: 0 
+                    switchInterval: 1,           // Small delay to prevent switching crash
+                    defaultBandwidthEstimate: 500000 
                 },
                 drm: drmConfig
             };
@@ -191,13 +204,18 @@
             try {
                 await player.load(url);
                 
-                // Force Autoplay Logic
-                video.play().catch(() => {
-                    // If sound blocks autoplay, mute and play
-                    video.muted = true;
-                    video.play();
-                    updIcon('pause'); // Update icon
-                });
+                // Aggressive Autoplay with Sound
+                var playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(_ => {
+                        // Play successful with sound
+                    }).catch(error => {
+                        // If blocked, try mute play
+                        video.muted = true;
+                        video.play();
+                        updIcon('pause');
+                    });
+                }
 
                 if (player.isLive()) video.currentTime = player.seekRange().end - 1;
                 startTimer();
@@ -233,7 +251,6 @@
             const a = document.getElementById('audio-menu');
             a.innerHTML = `<div style="padding:12px;font-weight:bold;border-bottom:1px solid #333;display:flex;justify-content:space-between">Audio <span onclick="closeAllMenus()" style="cursor:pointer">×</span></div>`;
             
-            // Language Name Converter
             const langName = new Intl.DisplayNames(['en'], { type: 'language' });
 
             player.getAudioLanguages().forEach(l => {
